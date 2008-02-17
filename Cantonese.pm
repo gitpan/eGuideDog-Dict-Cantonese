@@ -26,7 +26,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.1';
+our $VERSION = '0.2';
 
 
 # Preloaded methods go here.
@@ -35,6 +35,7 @@ sub new() {
   my $self = {};
   $self->{jyutping} = {};
   $self->{words} = {};
+  $self->{word_index} = {};
   bless $self, __PACKAGE__;
 
   # load zhy_list
@@ -56,6 +57,16 @@ sub import_zhy_list {
       if ($1 && $2) {
 	$self->{jyutping}->{$1} = $2;
       }
+    } elsif ($line =~ /^[(]([^)]*)[)]\s([^\s]*)\s$/) {
+      my @chars = split(/ /, $1);
+      my @symbols = split(/[|]/, $2);
+      my $word = join("", @chars);
+      if ($self->{word_index}->{$chars[0]}) {
+	push(@{$self->{word_index}->{$chars[0]}}, $word);
+      } else {
+	$self->{word_index}->{$chars[0]} = [$word];
+      }
+      $self->{words}->{$word} = \@symbols;
     }
   }
   close(ZHY_LIST);
@@ -69,27 +80,58 @@ sub get_jyutping {
       warn "$str is not in utf8 encoding.";
       return undef;
     }
+  } elsif (not $str) {
+    return undef;
   }
 
-  # one character
-  if (length($str) == 1) {
-    return $self->{jyutping}->{$str};
-  }
-
-  # multi characters
-  else {
+  if (wantarray) {
     my @jyutping;
     for (my $i = 0; $i < length($str); $i++) {
-      push(@jyutping, $self->{jyutping}->{substr($str, $i, 1)});
+      my $char = substr($str, $i, 1);
+      my @words = $self->get_words($char);
+      my $longest_word = '';
+      foreach my $word (@words) {
+	if (index($str, $word) == 0) {
+	  if (length($word) > length($longest_word)) {
+	    $longest_word = $word;
+	  }
+	}
+      }
+      if ($longest_word) {
+	push(@jyutping, $self->{words}->{$longest_word});
+	$i += $#{$self->{words}->{$longest_word}};
+      } else {
+	push(@jyutping, $self->{jyutping}->{$char});
+      }
     }
     return @jyutping;
+  } else {
+    my $char = substr($str, 0, 1);
+    my @words = $self->get_words($char);
+    my $longest_word = '';
+    foreach my $word (@words) {
+      if (index($str, $word) == 0) {
+	if (length($word) > length($longest_word)) {
+	  $longest_word = $word;
+	}
+      }
+    }
+    if ($longest_word) {
+      return $self->{words}->{$longest_word}->[0];
+    } else {
+      return $self->{jyutping}->{$char};
+    }
   }
 }
 
 sub get_words {
-    my ($self, $char) = @_;
+  my ($self, $char) = @_;
 
-    return @{$self->{words}};
+  if ($self->{word_index}->{$char}) {
+    return @{$self->{word_index}->{$char}};
+  } else {
+    return ();
+  }
 }
 
 1;
@@ -107,10 +149,14 @@ eGuideDog::Dict::Cantonese - an informal Jyutping dictionary.
 
   binmode(stdout, 'utf8');
   my $dict = eGuideDog::Dict::Cantonese::new();
-  my $symbol = $dict->get_jyutping("广");
-  print "广: $symbol\n"; # 广: gwong2
+  my $symbol = $dict->get_jyutping("长");
+  print "长: $symbol\n"; # 长: coeng4
+  $symbol = $dict->get_jyutping("长辈");
+  print "长辈的长: $symbol\n"; # zoeng2
   my @symbols = $dict->get_jyutping("粤拼");
-  print "粤拼: ", join(' ', @symbols), "\n"; # 粤拼: jyut6 ping3
+  print "粤拼: @symbols\n"; # 粤拼: jyut6 ping3
+  my @words = $dict->get_words("长");
+  print "Some words begin with 长: @words\n";
 
 =head1 DESCRIPTION
 
@@ -126,11 +172,15 @@ None by default.
 
 Initialize dictionary.
 
-=head2 get_jyutping($chars)
+=head2 get_jyutping($str)
 
-Return a scalar of jyutping symbols if only one character is requested.
+Return a scalar of jyutping symbol of the first character if it is in a scalar context.
 
-Return an array of jyutping symbols if multi-character is requested.
+Return an array of jyutping symbols of all characters in $str if it is in an array context.
+
+=head2 get_words($char)
+
+Return an array of words which are begined with $char. This list of word contains multi-symbol characters and the symbol used in the word is less frequent.
 
 =head1 SEE ALSO
 
