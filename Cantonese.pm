@@ -27,7 +27,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.3';
+our $VERSION = '0.31';
 
 
 # Preloaded methods go here.
@@ -103,7 +103,8 @@ sub import_unihan {
 
 sub add_symbol {
   my ($self, $char, $symbol) = @_;
-  if ($self->{chars}->{$char}) {
+
+  if (not $self->{chars}->{$char}) {
     $self->{chars}->{$char} = [$symbol];
     return 1;
   } else {
@@ -113,6 +114,7 @@ sub add_symbol {
       }
     }
     $self->{chars}->{$char} = [@{$self->{chars}->{$char}}, $symbol];
+    return 1;
   }
 }
 
@@ -131,6 +133,7 @@ sub import_zhy_list {
       my @symbols = split(/[|]/, $2);
       if ($#chars != $#symbols) {
 	warn "Dictionary error:" . "@chars" . "-" . "@symbols";
+        next;
       }
       my $word = join("", @chars);
       if ($self->{word_index}->{$chars[0]}) {
