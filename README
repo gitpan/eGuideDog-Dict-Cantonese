@@ -29,10 +29,22 @@ This module requires these other modules and libraries:
 
 COPYRIGHT AND LICENCE
 
-Put the correct copyright and licence information here.
+Of the source:
 
-Copyright (C) 2007 
+  Copyright (C) 2007 Cameron Wong
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself. 
+  This library is free software; you can redistribute it and/or modify
+  it under the same terms as Perl itself. 
 
+Of the Source Data zhy_list
+
+  It's the Cantonese dictionary of eSpeak TTS (http://espeak.sf.net). Refer the file zhy_list itself for more detail.
+
+Of the Source Data Cantonese.txt
+
+  Copyright (c) 1996-2006 Unicode, Inc. All Rights reserved.
+
+    Name: Unihan database
+    Unicode version: 5.0.0
+    Table version: 1.1
+    Date: 7 July 2006

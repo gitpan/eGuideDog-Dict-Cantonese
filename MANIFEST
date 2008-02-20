@@ -3,6 +3,7 @@ Changes
 Makefile.PL
 MANIFEST
 README
-zhy_list
+Cantonese.dict
 t/1.t
+t/2.t
 META.yml                                 Module meta-data (added by MakeMaker)

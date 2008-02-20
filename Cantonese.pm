@@ -1,9 +1,10 @@
 package eGuideDog::Dict::Cantonese;
 
-use 5.008;
 use strict;
 use warnings;
 use utf8;
+use Encode::CNMap;
+use Storable;
 
 require Exporter;
 
@@ -26,26 +27,93 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.2';
+our $VERSION = '0.3';
 
 
 # Preloaded methods go here.
 
 sub new() {
   my $self = {};
-  $self->{jyutping} = {};
-  $self->{words} = {};
-  $self->{word_index} = {};
+  $self->{jyutping} = {}; # The most probably phonetic symbol
+  $self->{chars} = {}; # all phonetic symbols (array ref)
+  $self->{words} = {}; # word phonetic symbols (array ref)
+  $self->{word_index} = {}; # the first char to words (array ref)
   bless $self, __PACKAGE__;
 
   # load zhy_list
   my $dir = __FILE__;
   $dir =~ s/[.]pm$//;
-  $self->import_zhy_list("$dir/zhy_list");
 
-  # load words
+  if(-e "$dir/Cantonese.dict") {
+    my $dict = retrieve("$dir/Cantonese.dict");
+    $self->{jyutping} = $dict->{jyutping};
+    $self->{chars} = $dict->{chars};
+    $self->{words} = $dict->{words};
+    $self->{word_index} = $dict->{word_index};
+  }
 
   return $self;
+}
+
+sub update_dict {
+  my $self = shift;
+
+  $self->{jyutping} = {};
+  $self->{chars} = {};
+  $self->{words} = {};
+  $self->{word_index} = {};
+
+  $self->import_unihan("Cantonese.txt");
+  $self->import_zhy_list("zhy_list");
+
+  my $dict = {jyutping => $self->{jyutping},
+	      chars => $self->{chars},
+	      words => $self->{words},
+	      word_index => $self->{word_index},
+	     };
+  store($dict, "Cantonese.dict");
+}
+
+sub import_unihan {
+  my ($self, $cantonese_txt) = @_;
+  open(DATA_FILE, '<', $cantonese_txt);
+  while(<DATA_FILE>) {
+    chomp;
+    my @line = split(/\s+/, $_);
+    my $char = chr(hex($line[0]));
+    my @phons = @line[1 .. $#line];
+    if (not defined $self->{chars}->{$char}) {
+      $self->{chars}->{$char} = \@phons;
+    }
+    my $char_simp = utf8_to_simputf8($char);
+    if ($char_simp !~ /[?]/) {
+      if (!defined $self->{chars}->{$char_simp}) {
+	$self->{chars}->{$char_simp} = \@phons;
+      }
+    }
+    my $char_trad = utf8_to_tradutf8($char);
+    if ($char_trad !~ /[?]/) {
+      if (!defined $self->{chars}->{$char_trad}) {
+	$self->{chars}->{$char_trad} = \@phons;
+      }
+    }
+  }
+  close(DATA_FILE);
+}
+
+sub add_symbol {
+  my ($self, $char, $symbol) = @_;
+  if ($self->{chars}->{$char}) {
+    $self->{chars}->{$char} = [$symbol];
+    return 1;
+  } else {
+    foreach (@{$self->{chars}->{$char}}) {
+      if ($symbol eq $_) {
+	return 0;
+      }
+    }
+    $self->{chars}->{$char} = [@{$self->{chars}->{$char}}, $symbol];
+  }
 }
 
 sub import_zhy_list {
@@ -56,10 +124,14 @@ sub import_zhy_list {
     if ($line =~ /^(.)\s([^\s]*)\s$/) {
       if ($1 && $2) {
 	$self->{jyutping}->{$1} = $2;
+	$self->add_symbol($1, $2);
       }
     } elsif ($line =~ /^[(]([^)]*)[)]\s([^\s]*)\s$/) {
       my @chars = split(/ /, $1);
       my @symbols = split(/[|]/, $2);
+      if ($#chars != $#symbols) {
+	warn "Dictionary error:" . "@chars" . "-" . "@symbols";
+      }
       my $word = join("", @chars);
       if ($self->{word_index}->{$chars[0]}) {
 	push(@{$self->{word_index}->{$chars[0]}}, $word);
@@ -67,9 +139,24 @@ sub import_zhy_list {
 	$self->{word_index}->{$chars[0]} = [$word];
       }
       $self->{words}->{$word} = \@symbols;
+      for (my $i = 0; $i <= $#chars; $i++) {
+	$self->add_symbol($chars[$i], $symbols[$i]);
+      }
     }
   }
   close(ZHY_LIST);
+
+  # add numbers
+  $self->{jyutping}->{"0"} = "ling4";
+  $self->{jyutping}->{"1"} = "jat1";
+  $self->{jyutping}->{"2"} = "ji6";
+  $self->{jyutping}->{"3"} = "saam1";
+  $self->{jyutping}->{"4"} = "sei3";
+  $self->{jyutping}->{"5"} = "ng5";
+  $self->{jyutping}->{"6"} = "luk6";
+  $self->{jyutping}->{"7"} = "cat1";
+  $self->{jyutping}->{"8"} = "baat3";
+  $self->{jyutping}->{"9"} = "gau2";
 }
 
 sub get_jyutping {
@@ -98,7 +185,7 @@ sub get_jyutping {
 	}
       }
       if ($longest_word) {
-	push(@jyutping, $self->{words}->{$longest_word});
+	push(@jyutping, @{$self->{words}->{$longest_word}});
 	$i += $#{$self->{words}->{$longest_word}};
       } else {
 	push(@jyutping, $self->{jyutping}->{$char});
@@ -134,6 +221,20 @@ sub get_words {
   }
 }
 
+sub is_multi_phon {
+  my ($self, $char) = @_;
+  return $#{$self->{chars}->{$char}};
+}
+
+sub get_multi_phon {
+  my ($self, $char) = @_;
+  if ($self->{chars}->{$char}) {
+    return @{$self->{chars}->{$char}};
+  } else {
+    return undef;
+  }
+}
+
 1;
 __END__
 # Below is stub documentation for your module. You'd better edit it!
@@ -160,7 +261,7 @@ eGuideDog::Dict::Cantonese - an informal Jyutping dictionary.
 
 =head1 DESCRIPTION
 
-This module is for looking up Jyutping of Cantonese characters or words. It's edited by a programmer not a linguistician. There will be many errors. So don't take it serious. It's a part of the eGuideDog project (http://e-guidedog.sf.net).
+This module is for looking up Jyutping of Cantonese characters or words. It's edited by a programmer not a linguistician. There will are many mistakes. So don't take it serious. It's a part of the eGuideDog project (http://e-guidedog.sf.net).
 
 =head2 EXPORT
 
@@ -174,13 +275,23 @@ Initialize dictionary.
 
 =head2 get_jyutping($str)
 
-Return a scalar of jyutping symbol of the first character if it is in a scalar context.
+Return a scalar of jyutping phonetic symbol of the first character if it is in a scalar context.
 
-Return an array of jyutping symbols of all characters in $str if it is in an array context.
+Return an array of jyutping phonetic symbols of all characters in $str if it is in an array context.
 
 =head2 get_words($char)
 
-Return an array of words which are begined with $char. This list of word contains multi-symbol characters and the symbol used in the word is less frequent.
+Return an array of words which are begined with $char. This list of words contains multi-phonetic-symbol characters and the symbol used in the word is less frequent than the other.
+
+=head2 is_multi_phon($char)
+
+Return non-zero if $char is multi-phonetic-symbol character. The returned value plus 1 is the number of phonetic symbols the character has.
+
+Return 0 if $char is single-phonetic-symbol character.
+
+=head2 get_multi_phon($char)
+
+Return an array of phonetic symbols of $char.
 
 =head1 SEE ALSO
 
@@ -192,9 +303,23 @@ Cameron Wong, E<lt>hgn823-perl at yahoo.com.cnE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
+=over 2
+
+=item of the Module
+
 Copyright 2008 by Cameron Wong
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself. 
+This library is free software; you can redistribute it and/or modify it under the same terms as Perl itself.
+
+=item Some of the dictionary data is from Unihan
+
+Copyright (c) 1996-2006 Unicode, Inc. All Rights reserved.
+
+  Name: Unihan database
+  Unicode version: 5.0.0
+  Table version: 1.1
+  Date: 7 July 2006
+
+=back
 
 =cut
