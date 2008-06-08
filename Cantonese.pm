@@ -27,7 +27,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.31';
+our $VERSION = '0.4';
 
 
 # Preloaded methods go here.
@@ -298,7 +298,7 @@ Return an array of phonetic symbols of $char.
 
 =head1 SEE ALSO
 
-L<http://e-guidedog.sf.net>
+L<eGuideDog::Dict::Mandarin>, L<http://e-guidedog.sf.net>
 
 =head1 AUTHOR
 
