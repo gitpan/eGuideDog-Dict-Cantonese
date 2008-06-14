@@ -27,7 +27,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '0.4';
+our $VERSION = '0.41';
 
 
 # Preloaded methods go here.
@@ -242,6 +242,8 @@ sub get_multi_phon {
 __END__
 # Below is stub documentation for your module. You'd better edit it!
 
+=encoding utf8
+
 =head1 NAME
 
 eGuideDog::Dict::Cantonese - an informal Jyutping dictionary.
@@ -252,19 +254,21 @@ eGuideDog::Dict::Cantonese - an informal Jyutping dictionary.
   use eGuideDog::Dict::Cantonese;
 
   binmode(stdout, 'utf8');
-  my $dict = eGuideDog::Dict::Cantonese::new();
+  my $dict = eGuideDog::Dict::Cantonese->new();
+  my @symbols = $dict->get_multi_phon("长");
+  print "长(all pronunciation): @symbols\n"; # cong2 zoeng2 coeng4 - cong2 should be a mistake in dictionary. This kind of mistake is common and the dictionary is far from perfect.
   my $symbol = $dict->get_jyutping("长");
-  print "长: $symbol\n"; # 长: coeng4
+  print "长(default pronunciation): $symbol\n"; # 长: coeng4
   $symbol = $dict->get_jyutping("长辈");
   print "长辈的长: $symbol\n"; # zoeng2
-  my @symbols = $dict->get_jyutping("粤拼");
+  @symbols = $dict->get_jyutping("粤拼");
   print "粤拼: @symbols\n"; # 粤拼: jyut6 ping3
   my @words = $dict->get_words("长");
   print "Some words begin with 长: @words\n";
 
 =head1 DESCRIPTION
 
-This module is for looking up Jyutping of Cantonese characters or words. It's edited by a programmer not a linguistician. There will are many mistakes. So don't take it serious. It's a part of the eGuideDog project (http://e-guidedog.sf.net).
+This module is for looking up Jyutping of Cantonese characters or words. It's edited by a programmer not a linguistician. There are many mistakes. So don't take it serious. It's a part of the eGuideDog project (http://e-guidedog.sf.net).
 
 =head2 EXPORT
 
@@ -278,13 +282,13 @@ Initialize dictionary.
 
 =head2 get_jyutping($str)
 
-Return a scalar of jyutping phonetic symbol of the first character if it is in a scalar context.
-
 Return an array of jyutping phonetic symbols of all characters in $str if it is in an array context.
+
+Return a string of jyutping phonetic symbol of the first character if it is not in array context. If it's a multi-phonetic-symbol character, the default symbol will be output.
 
 =head2 get_words($char)
 
-Return an array of words which are begined with $char. This list of words contains multi-phonetic-symbol characters and the symbol used in the word is less frequent than the other.
+Return an array of words which are begined with $char. This list of words contains multi-phonetic-symbol characters and the symbol used in the word is not the default one.
 
 =head2 is_multi_phon($char)
 

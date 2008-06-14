@@ -2,7 +2,7 @@ use strict;
 use Storable;
 
 # init dictionary
-`rm Cantonese.dict`;
+`rm -f Cantonese.dict`;
 my $dict = {pinyin => {},
     chars => {},
     words => {},
